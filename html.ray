@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulir Pendaftaran Siswa Baru</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase and authentication
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const __initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let db, auth;
+
+        // Function to initialize Firebase and authenticate
+        async function initializeAndAuthenticate() {
+            try {
+                const app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (__initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                console.log("Firebase initialized and authenticated successfully.");
+            } catch (error) {
+                console.error("Error initializing Firebase or authenticating:", error);
+                document.getElementById('status-message').textContent = 'Error: Gagal terhubung ke database. Silakan coba lagi.';
+            }
+        }
+
+        // Handle form submission
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const statusMessage = document.getElementById('status-message');
+            statusMessage.textContent = 'Menyimpan data...';
+            statusMessage.classList.remove('text-red-500', 'text-green-500');
+            statusMessage.classList.add('text-gray-500');
+
+            if (!db || !auth.currentUser) {
+                statusMessage.textContent = 'Error: Database tidak terhubung. Silakan muat ulang halaman.';
+                statusMessage.classList.add('text-red-500');
+                return;
+            }
+
+            const siswaData = {
+                namaLengkap: form.namaLengkap.value,
+                tanggalLahir: form.tanggalLahir.value,
+                alamat: form.alamat.value,
+                sekolahAsal: form.sekolahAsal.value,
+                dataDibuat: serverTimestamp(),
+                userId: auth.currentUser.uid // Save user ID for private data
+            };
+
+            const userId = auth.currentUser.uid;
+            const collectionPath = `/artifacts/${appId}/users/${userId}/pendaftaran-siswa`;
+
+            try {
+                await addDoc(collection(db, collectionPath), siswaData);
+                statusMessage.textContent = 'Data berhasil disimpan!';
+                statusMessage.classList.remove('text-gray-500', 'text-red-500');
+                statusMessage.classList.add('text-green-500');
+                form.reset();
+            } catch (e) {
+                console.error("Error adding document: ", e);
+                statusMessage.textContent = 'Error: Gagal menyimpan data. Silakan coba lagi.';
+                statusMessage.classList.remove('text-gray-500', 'text-green-500');
+                statusMessage.classList.add('text-red-500');
+            }
+        }
+
+        // Attach event listener after the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeAndAuthenticate();
+            const form = document.getElementById('registrationForm');
+            if (form) {
+                form.addEventListener('submit', handleFormSubmit);
+            }
+        });
+    </script>
+</head>
+<body class="bg-gray-100 p-8 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-lg border-2 border-slate-300">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">Formulir Pendaftaran Siswa Baru</h1>
+        <p class="text-center text-gray-600 mb-8">Silakan isi data diri Anda dengan lengkap dan benar.</p>
+        
+        <form id="registrationForm" class="space-y-4">
+            <div>
+                <label for="namaLengkap" class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                <input type="text" id="namaLengkap" name="namaLengkap" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            
+            <div>
+                <label for="tanggalLahir" class="block text-sm font-medium text-gray-700 mb-1">Tanggal Lahir</label>
+                <input type="date" id="tanggalLahir" name="tanggalLahir" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            
+            <div>
+                <label for="alamat" class="block text-sm font-medium text-gray-700 mb-1">Alamat Lengkap</label>
+                <textarea id="alamat" name="alamat" rows="3" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></textarea>
+            </div>
+            
+            <div>
+                <label for="sekolahAsal" class="block text-sm font-medium text-gray-700 mb-1">Sekolah Asal</label>
+                <input type="text" id="sekolahAsal" name="sekolahAsal" required class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+            </div>
+            
+            <div class="pt-4">
+                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                    Daftar Sekarang
+                </button>
+            </div>
+        </form>
+
+        <div id="status-message" class="mt-6 text-center text-sm font-medium"></div>
+    </div>
+</body>
+</html>
